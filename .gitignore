@@ -1,0 +1,37 @@
+# ── Python environment patterns ──────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+ENV/
+env/
+
+# ── Project runtime folders ──────────────────────────────────────────────────
+output/
+input/
+
+# ── Visual test datasets & temporary outputs ───────────────────────────────
+test_clips/
+test_clips_results.json
+puppy_test.mp4
+*.mp4
+debug.py
+
+# ── Editor/IDE specific configurations ────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── API Environment configurations ────────────────────────────────────────────
+.env
+
+# ── Testing scripts ──────────────────────────────────────────────────────────
+test_*.py
+pipeline/test_*.py
+.vercel
+
+# ── Docker artifacts ──────────────────────────────────────────────────────────
+*.tar

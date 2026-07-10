@@ -1,0 +1,18 @@
+# ── VoxFrame Core Dependencies ────────────────────────────────────────────────
+
+# HTTP requests client for streaming downloads
+requests>=2.31.0
+
+# Environment configurations and secret loadings
+python-dotenv>=1.0.0
+
+# Data verification schemas and models
+pydantic>=2.7.0
+
+# API bindings for Firework AI and Groq endpoints
+openai>=1.40.0
+
+# Web Dashboard dependencies
+fastapi>=0.100.0
+uvicorn>=0.23.0
+python-multipart>=0.0.6
