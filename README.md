@@ -124,7 +124,9 @@ WEAK_STYLE_CANDIDATES=3      # Multi-candidate budget
 
 ## 🚀 Running VoxFrame (Docker)
 
-To ensure a seamless experience across all environments, VoxFrame is entirely containerized using Docker. The necessary environment variables are passed at runtime using a `.env` file, ensuring no hardcoded keys are present in the image.
+## 🚀 Running VoxFrame (Docker)
+
+To ensure a seamless experience across all environments, VoxFrame is entirely containerized using Docker. The necessary environment variables are pre-configured into the container, so no local setup is required.
 
 ### 1. Build the Docker Image
 First, build the Docker container using the provided `Dockerfile`.
@@ -133,16 +135,16 @@ docker build -t voxframe-app .
 ```
 
 ### 2. Run the Visual Web Dashboard
-Start the container and expose port `7860` to access the premium drag-and-drop web interface. We also pass the `.env` file and mount local input/output directories so your data persists.
+Start the container and expose port `7860` to access the premium drag-and-drop web interface. We mount local input and output directories so your data persists.
 
 **For Windows (PowerShell):**
 ```powershell
-docker run -it --rm --env-file .env -p 7860:7860 -v "${PWD}\sample_inputs:/input" -v "${PWD}\output:/output" --name my-voxframe-app voxframe-app
+docker run -it --rm -p 7860:7860 -v "${PWD}\sample_inputs:/input" -v "${PWD}\output:/output" --name my-voxframe-app voxframe-app
 ```
 
 **For Linux / macOS:**
 ```bash
-docker run -it --rm --env-file .env -p 7860:7860 -v "$(pwd)/sample_inputs:/input" -v "$(pwd)/output:/output" --name my-voxframe-app voxframe-app
+docker run -it --rm -p 7860:7860 -v "$(pwd)/sample_inputs:/input" -v "$(pwd)/output:/output" --name my-voxframe-app voxframe-app
 ```
 
 Then navigate your browser to **`http://127.0.0.1:7860`** to access the application.
@@ -154,7 +156,7 @@ docker save -o voxframe-image.tar voxframe-app
 ```
 
 ### 4. Load from Archive (For Evaluators/Users)
-If you are receiving the `.tar` file, load it into your Docker engine and run the dashboard directly without needing the source code (make sure to create a `.env` file first with your keys):
+If you are receiving the `.tar` file, load it into your Docker engine and run the dashboard directly without needing the source code:
 
 **Load Image:**
 ```bash
@@ -163,10 +165,10 @@ docker load -i voxframe-image.tar
 
 **Run Container (Windows PowerShell):**
 ```powershell
-docker run -it --rm --env-file .env -p 7860:7860 -v "${PWD}\sample_inputs:/input" -v "${PWD}\output:/output" --name my-voxframe-app voxframe-app
+docker run -it --rm -p 7860:7860 -v "${PWD}\sample_inputs:/input" -v "${PWD}\output:/output" --name my-voxframe-app voxframe-app
 ```
 
 **Run Container (Linux / macOS):**
 ```bash
-docker run -it --rm --env-file .env -p 7860:7860 -v "$(pwd)/sample_inputs:/input" -v "$(pwd)/output:/output" --name my-voxframe-app voxframe-app
+docker run -it --rm -p 7860:7860 -v "$(pwd)/sample_inputs:/input" -v "$(pwd)/output:/output" --name my-voxframe-app voxframe-app
 ```
