@@ -27,5 +27,5 @@ RUN mkdir -p /input /output
 # Expose the web dashboard port
 EXPOSE 7860
 
-# Run the web dashboard by default
-CMD ["python", "-m", "uvicorn", "web_dashboard.server:app", "--host", "0.0.0.0", "--port", "7860"]
+# Run the CLI engine by default (required for lablab.ai evaluation)
+CMD ["python", "run.py"]
