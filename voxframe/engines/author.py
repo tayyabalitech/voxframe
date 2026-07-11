@@ -32,50 +32,54 @@ class StylePersona:
 PERSONA_REGISTRY: tuple[StylePersona, ...] = (
     StylePersona(
         key="formal",
-        persona="an agency wire reporter issuing a factual, clear, and objective report",
+        persona="a wire news agency reporter filing a clear, factual, objective scene report",
         rules=(
-            "Maintain a professional, objective, and neutral third-person perspective",
-            "State only observable facts (what, who, action, setting) without personal opinions",
-            "Do not include exclamation points, slang, metaphors, or joking comments",
-            "Use full, grammatically correct sentences with precise wording",
+            "Write 1-2 complete sentences in objective, neutral third-person voice",
+            "State only observable visual facts: who/what is present, what they are doing, where they are",
+            "Include specific visual details: colors, count, clothing, environment, motion",
+            "Absolutely no exclamation points, no metaphors, no slang, no opinions",
+            "Precise wording only — avoid vague phrases like 'something' or 'a person'",
         ),
-        specimen="A professional cyclist travels at high speed down a steep mountain course.",
+        specimen="A young professional woman is seated at a desktop computer workstation in a bright, modern open-plan office, focused intently on her screen.",
         anti_pattern="Unbelievable! This rider is absolutely flying down the mountain trail!",
     ),
     StylePersona(
         key="sarcastic",
-        persona="a cynical, unimpressed observer stating the obvious with dry irony",
+        persona="a deadpan, unimpressed bystander who narrates the blindingly obvious with dry irony",
         rules=(
-            "Use subtle, deadpan irony and understated humor — do not state that you are joking",
-            "Describe the scene with mock-seriousness, as if noting something boringly obvious",
-            "Aim for a dry smirk rather than a direct laugh or silliness",
-            "Avoid excessive exclamation marks or loud, childish expressions",
+            "Write exactly ONE short sentence — punchy, dry, and effortlessly unimpressed",
+            "Comment on the scene as if the event is the most unremarkable thing imaginable",
+            "Acknowledge something obvious in the video as if it is a profound observation",
+            "NEVER describe the scene literally — react to it sarcastically from the sidelines",
+            "No exclamation marks, no LOL, no obvious joke setups — the humor is in the understatement",
         ),
-        specimen="Gravity functions as expected. The physical universe remains largely undisturbed.",
-        anti_pattern="OMG that is so funny, I'm literally crying laughing at this guy!",
+        specimen="A kitten outdoors, clearly plotting something elaborate and fully confident it will succeed.",
+        anti_pattern="OMG this is so funny, I am literally dying at this hilarious scene!",
     ),
     StylePersona(
         key="humorous_tech",
-        persona="a systems programmer who views all real-world events through computing metaphors",
+        persona="a senior engineer who can only process reality through technical metaphors and finds clever wordplay between code concepts and real-world visuals",
         rules=(
-            "Must incorporate at least one authentic software, hardware, or engineering concept",
-            "The technical analogy should drive or enhance the humor, not just be tagged on",
-            "Valid terms include pipeline, kernel, memory leak, cache miss, latency, or API",
-            "The joke must resonate with a technical developer audience",
+            "Find a tech term that DOUBLES as a description of something literally in the video (e.g., autumn leaves → leaf nodes, cat exploring → autonomous agent scanning, office worker → polling loop)",
+            "The wordplay must be clever and specific to THIS video — not just a generic tech sentence",
+            "1-2 sentences maximum, punchy and witty",
+            "The humor comes from the unexpected but perfectly fitting tech analogy",
+            "Must include at least one real software/hardware term: deployment, pipeline, kernel, API, agent, loop, thread, cache, etc.",
         ),
-        specimen="The runner's movement engine has disabled rate limiting, achieving maximum frame rate with zero garbage collection.",
+        specimen="Nature's annual deployment: all leaf nodes updated to yellow simultaneously, no breaking changes reported.",
         anti_pattern="This runner is moving fast, which requires high bandwidth calculation.",
     ),
     StylePersona(
         key="humorous_non_tech",
-        persona="a witty friend sending a clever voice note to a general group chat",
+        persona="a witty friend sending a clever voice note about what they just saw — relatable, funny, zero jargon",
         rules=(
-            "Use accessible, lighthearted humor that any general audience can appreciate",
-            "Think of witty everyday remarks, sitcom tropes, or friendly banter",
-            "Strictly exclude any technical, developer, or programming jargon",
-            "Keep the phrasing conversational, natural, and friendly",
+            "Write ONE sentence — conversational, relatable, and genuinely funny to a general audience",
+            "Comment on the scene with the energy of a group chat message — casual and clever",
+            "Draw a relatable parallel: what does this scene remind everyone of in real life?",
+            "Absolutely no technical, developer, or programming words of any kind",
+            "Avoid sounding like a formal description — this is banter, not a report",
         ),
-        specimen="Someone forgot to tell this person that running up vertical walls isn't normally allowed.",
+        specimen="The trees got together and decided to put on a show, and honestly they are the only ones putting in any effort.",
         anti_pattern="His velocity calculation iterates recursively without hitting any base condition.",
     ),
 )
@@ -183,6 +187,31 @@ Rules:
 """
 
 
+# ── Few-Shot Reference Examples ──────────────────────────────────────────────
+
+FEW_SHOT_EXAMPLES = """
+REFERENCE STYLE EXAMPLES (study the tone and structure of each style — do NOT copy the content):
+
+Example A — Autumn trees on a city road with busy traffic:
+  formal: "A wide urban boulevard lined with golden ginkgo trees in full autumn foliage, with multiple lanes of traffic flowing through the city below high-rise residential buildings."
+  sarcastic: "A city that decided trees were a good idea, which is more than most cities can say."
+  humorous_tech: "Nature's annual deployment: all leaf nodes updated to yellow simultaneously, no breaking changes reported."
+  humorous_non_tech: "The trees got together and decided to put on a show, and honestly they are the only ones putting in any effort."
+
+Example B — Small orange kitten sitting among green foliage outdoors:
+  formal: "A young orange tabby kitten sits among dense green foliage in an outdoor setting, looking directly at the camera with an alert and curious expression."
+  sarcastic: "A kitten outdoors, clearly plotting something elaborate and fully confident it will succeed."
+  humorous_tech: "A small autonomous agent has entered the garden environment and is scanning for input. Next action: unknown. Rollback plan: none."
+  humorous_non_tech: "A tiny cat has gone outside and is now judging everything it sees with great authority."
+
+Example C — Young woman working at a desktop computer in a modern office:
+  formal: "A young professional woman is seated at a desktop computer workstation in a bright, modern open-plan office, focused intently on her screen."
+  sarcastic: "A person at a computer, apparently working, which is exactly what someone would do if they were not working."
+  humorous_tech: "She has been staring at this bug for forty minutes. The bug is a missing comma. The comma is winning."
+  humorous_non_tech: "A woman at a computer, visibly handling something extremely important that will be completely forgotten by Thursday."
+"""
+
+
 def assemble_composition_prompt(visual_report: str, transcript: str = "", priorities: list[str] | None = None) -> str:
     """Constructs the system instructions for generating the styled captions."""
     audio_segment = (
@@ -201,23 +230,26 @@ def assemble_composition_prompt(visual_report: str, transcript: str = "", priori
             f"  {p.key}\n"
             f"    Persona Voice: {p.persona}\n"
             f"    Required Rules:\n{rules_bulleted}\n"
-            f"    Gold standard: \"{p.specimen}\"\n"
-            f"    Avoid pattern: \"{p.anti_pattern}\""
+            f"    Gold standard example: \"{p.specimen}\"\n"
+            f"    Strictly avoid this pattern: \"{p.anti_pattern}\""
         )
 
     return (
-        "You are writing a set of unique styled captions for a short video clip.\n"
-        "Ensure all descriptions are strictly derived from the scene analysis report below. Do not invent details.\n\n"
+        "You are an expert caption writer generating styled captions for a short video clip.\n"
+        "Your captions must be based STRICTLY on the scene analysis below. Do not invent details not present in the scene.\n\n"
+        f"{FEW_SHOT_EXAMPLES}\n"
+        "---\n"
+        f"NOW WRITE CAPTIONS FOR THIS VIDEO:\n\n"
         f"SCENE SUMMARY:\n{visual_report}\n"
         f"{audio_segment}"
         f"{priority_flag}\n"
-        "Create ONE caption for each style:\n\n"
+        "Write ONE caption per style. Follow the persona rules and reference examples strictly:\n\n"
         + "\n\n".join(style_descriptions)
         + "\n\nOUTPUT COMPLIANCE RULES:\n"
-        "- Return ONLY a valid JSON object. Do not wrap in markdown syntax or add pre/post explanation text.\n"
+        "- Return ONLY a valid JSON object. No markdown, no explanation, no preamble.\n"
         '- Required JSON format: {"formal":"...","sarcastic":"...","humorous_tech":"...","humorous_non_tech":"..."}\n'
-        f"- Length limit: each style caption must be 1-2 complete sentences and fall between {AppConfig.MIN_WORDS} and {AppConfig.MAX_WORDS} words.\n"
-        "- Ensure sentence structures and verb selections are distinct across styles to maintain a unique persona voice."
+        f"- Length: each caption must be 1-2 sentences and between {AppConfig.MIN_WORDS} and {AppConfig.MAX_WORDS} words.\n"
+        "- CRITICAL: sarcastic must be a short, dry, one-liner — NOT a description. humorous_tech must have clever wordplay tied to something literally visible in the video."
     )
 
 
@@ -238,7 +270,7 @@ def generate_visual_context(api_client: OpenAI, frames: list[str], frame_cache: 
         response = api_client.chat.completions.create(
             model=AppConfig.FIREWORKS_MODEL,
             messages=[{"role": "user", "content": payload_messages}],
-            max_tokens=350,
+            max_tokens=600,
             temperature=0.25,
             response_format={"type": "json_object"},
         )
@@ -334,7 +366,7 @@ def call_vision_generation(
     """Attempts generation using the primary model twice, then falls back to secondary model."""
     last_encountered_exception = None
 
-    for attempt_index, temperature in enumerate([0.75, 0.90]):
+    for attempt_index, temperature in enumerate([0.95, 1.05]):
         try:
             return request_model_inference(
                 api_client,

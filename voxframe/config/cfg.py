@@ -36,8 +36,8 @@ class AppConfig:
 
     # ── Narrative Auditing & Refinement Rubrics ──────────────────────────────
     EVAL_THRESHOLD: float = float(os.environ.get("SCORE_THRESHOLD", "0.65"))
-    MIN_WORDS: int = int(os.environ.get("CAPTION_MIN_WORDS", "12"))
-    MAX_WORDS: int = int(os.environ.get("CAPTION_MAX_WORDS", "60"))
+    MIN_WORDS: int = int(os.environ.get("CAPTION_MIN_WORDS", "8"))
+    MAX_WORDS: int = int(os.environ.get("CAPTION_MAX_WORDS", "70"))
     MAX_REGEN_TRIES: int = int(os.environ.get("WEAK_STYLE_CANDIDATES", "3"))
 
     # ── Target Formats ────────────────────────────────────────────────────────
