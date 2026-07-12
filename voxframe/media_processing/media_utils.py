@@ -6,6 +6,7 @@ extracting frame data, isolating audio tracks, and performing text-to-speech
 transcriptions using the Groq Whisper API.
 """
 import os
+import re
 import subprocess
 import tempfile
 import requests
@@ -71,22 +72,82 @@ def determine_frame_count(length_in_sec: float, manual_count: int = 0) -> int:
         return 10
 
 
+def _extract_scene_change_timestamps(video_source: str, scene_threshold: float = 0.18) -> list[float]:
+    """Returns timestamps where ffmpeg detects a notable scene change."""
+    ffmpeg_arguments = [
+        "ffmpeg",
+        "-hide_banner",
+        "-i", video_source,
+        "-vf", f"select='gt(scene\\,{scene_threshold})',showinfo",
+        "-f", "null",
+        "-",
+    ]
+    process_result = subprocess.run(ffmpeg_arguments, capture_output=True, text=True)
+    combined_output = f"{process_result.stdout}\n{process_result.stderr}"
+
+    timestamps: list[float] = []
+    for match in re.finditer(r"pts_time:(\d+(?:\.\d+)?)", combined_output):
+        timestamps.append(float(match.group(1)))
+
+    unique_timestamps = sorted({round(timestamp, 2) for timestamp in timestamps})
+    return unique_timestamps
+
+
+def _build_sampling_timestamps(duration: float, count: int, scene_timestamps: list[float]) -> list[float]:
+    """Combines uniform coverage and scene-change coverage into a compact sample set."""
+    padding = duration * 0.05
+    effective_range = max(duration - (2.0 * padding), 0.1)
+
+    base_timestamps = [
+        padding + (effective_range * idx / max(count - 1, 1))
+        for idx in range(count)
+    ]
+
+    candidate_pool = sorted({
+        round(timestamp, 2)
+        for timestamp in base_timestamps + scene_timestamps
+        if padding <= timestamp <= (duration - padding)
+    })
+
+    if len(candidate_pool) <= count:
+        return candidate_pool
+
+    selected: list[float] = []
+    anchor_points = [candidate_pool[0], candidate_pool[len(candidate_pool) // 2], candidate_pool[-1]]
+    for anchor in anchor_points:
+        if anchor not in selected:
+            selected.append(anchor)
+        if len(selected) >= count:
+            break
+
+    while len(selected) < count:
+        best_timestamp = None
+        best_distance = -1.0
+        for candidate in candidate_pool:
+            if candidate in selected:
+                continue
+            nearest_distance = min(abs(candidate - existing) for existing in selected) if selected else float("inf")
+            if nearest_distance > best_distance:
+                best_distance = nearest_distance
+                best_timestamp = candidate
+
+        if best_timestamp is None:
+            break
+        selected.append(best_timestamp)
+
+    return sorted(selected[:count])
+
+
 def extract_video_keyframes(video_source: str, output_directory: str, count: int) -> list[str]:
     """
     Samples keyframes chronological from the video using FFmpeg.
 
-    Applies a 5% margin on both ends of the timeline to prevent capturing blank frames,
-    rescaling images to 640px wide to optimize network usage.
+    Combines uniform timeline sampling with scene-change candidates to improve coverage,
+    then rescales images to 640px wide to optimize network usage.
     """
     clip_duration = get_video_length(video_source)
-    padding = clip_duration * 0.05
-    effective_range = clip_duration - (2.0 * padding)
-
-    # Compute keyframe timestamps
-    timestamps = [
-        padding + (effective_range * idx / max(count - 1, 1))
-        for idx in range(count)
-    ]
+    scene_timestamps = _extract_scene_change_timestamps(video_source)
+    timestamps = _build_sampling_timestamps(clip_duration, count, scene_timestamps)
 
     sampled_paths: list[str] = []
     for index, time_offset in enumerate(timestamps):

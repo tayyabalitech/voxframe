@@ -35,3 +35,6 @@ pipeline/test_*.py
 
 # ── Docker artifacts ──────────────────────────────────────────────────────────
 *.tar
+
+# ── Local notebooks (Colab checks, experiments) ───────────────────────────────
+notebooks/

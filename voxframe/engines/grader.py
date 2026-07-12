@@ -103,7 +103,7 @@ def assess_caption_quality(frames: list[str], captions: GeneratedCaptions) -> Ev
             payload_messages.append({"type": "image_url", "image_url": {"url": convert_to_base64_data_uri(path)}})
 
         response = api_client.chat.completions.create(
-            model=AppConfig.FIREWORKS_MODEL,
+            model=AppConfig.VISION_MODEL,
             messages=[{"role": "user", "content": payload_messages}],
             max_tokens=600,
             temperature=0.2,

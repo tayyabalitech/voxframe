@@ -110,7 +110,8 @@ def main() -> None:
 
     print(f"VoxFrame Narration Engine | Loaded {len(tasks)} task(s)")
     print(
-        f"  model={AppConfig.FIREWORKS_MODEL.split('/')[-1]}"
+        f"  vision_model={AppConfig.VISION_MODEL.split('/')[-1]}"
+        f"  text_model={AppConfig.TEXT_MODEL.split('/')[-1]}"
         f"  concurrency={AppConfig.CONCURRENT_LIMIT}"
         f"  timeout={AppConfig.PER_CLIP_TIMEOUT}s"
         f"  refine_threshold={AppConfig.EVAL_THRESHOLD}"

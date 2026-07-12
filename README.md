@@ -7,256 +7,231 @@
 |___/\__/|___/\__/|___/\__/|___/\__/|___/\__/|___/\__|
 ```
 
-**VoxFrame** is a state-of-the-art cognitive video analysis and narrative generation system designed for the **AMD Developer Hackathon: ACT II (Track 2)**. By integrating zero-latency ffmpeg frame capture pipelines, whisper-based speech-to-text, and low-temperature scene verification loops, VoxFrame translates raw video streams into highly aligned styled narratives across four distinct semantic registers.
+**VoxFrame** is a video captioning pipeline for **AMD Developer Hackathon: ACT II (Track 2)**. It downloads each clip, extracts adaptive keyframes, optionally transcribes speech, grounds the scene with a vision model, generates four styled captions, audits them locally, and refines weak styles with a vision-based self-grader.
 
 ---
 
-## 🛠️ System Architecture & Data Flow
-
-Unlike naive one-shot caption models that suffer from hallucinations and style drift, VoxFrame uses a rigorous **Comprehend-Verify-Compose-Audit** execution pattern to secure accuracy and stylistic separation.
+## 🛠️ Pipeline Overview
 
 ```
-                  +-----------------------------------+
-                  |      sample_inputs/tasks.json     |
-                  +-----------------------------------+
-                                    |
-                                    v
-                  +-----------------------------------+
-                  |    Video Download & Segmenting    |
-                  +-----------------------------------+
-                                    |
-            +-----------------------+-----------------------+
-            | (Visual Stream)                               | (Audio Track)
-            v                                               v
-+-----------------------+                       +-----------------------+
-|  Adaptive Keyframes   |                       |   PCM 16kHz WAV ASR   |
-|     (6/8/10 sampling) |                       |   (Groq Whisper v3)   |
-+-----------------------+                       +-----------------------+
-            |                                               |
-            +-----------------------+-----------------------+
-                                    |
-                                    v
-                  +-----------------------------------+
-                  |     Stage A: Scene Comprehension  |
-                  +-----------------------------------+
-                                    |
-                                    v
-                  +-----------------------------------+
-                  |    Stage A.2: Grounding Audit     |
-                  +-----------------------------------+
-                                    |
-                                    v
-                  +-----------------------------------+
-                  |     Stage B: Multitone Synthesis  |
-                  +-----------------------------------+
-                                    |
-                                    v
-                  +-----------------------------------+
-                  |    Rule-Based Post-Check Audit    |
-                  +-----------------------------------+
-                                    |  (Auditing violations detected)
-                                    v  --> [Targeted Re-Generation Pass]
-                  +-----------------------------------+
-                  |   Dimension Grader & Self-Refine  |
-                  +-----------------------------------+
-                                    |
-                                    v
-                  +-----------------------------------+
-                  |        output/results.json        |
-                  +-----------------------------------+
+sample_inputs/tasks.json
+        │
+        ▼
+Video download + adaptive keyframes (6/8/10) + Groq Whisper (optional)
+        │
+        ▼
+Stage A   Scene JSON grounding (minimax-m3)
+        │
+        ▼
+Stage A.2 Scene verification against frames
+        │
+        ▼
+Stage B   Vision-grounded caption JSON (minimax-m3 + frames)
+        │
+        ▼
+Stage C   Rule audit + targeted repair pass
+        │
+        ▼
+Stage D   Self-grader vs keyframes (minimax-m3)
+        │
+        ▼
+Stage E   Multi-candidate refinement for weak styles
+        │
+        ▼
+output/results.json
 ```
 
----
-
-## 📂 Modular Anatomy
-
-The implementation is structured into a clean, decoupled layout to decouple IO acquisition from inference and grading loops:
-
-* 📡 `voxframe.config`
-  * `cfg.py`: Loads `.env` secrets, initializes runtime limits, timeouts, and thresholds.
-  * `defs.py`: Strong data contracts (Pydantic V2) mapping input, scene comprehension schema, and evaluation scores.
-* 🎥 `voxframe.media_processing`
-  * `clip.py`: Downloads media, dynamically scales frame extraction buffers based on track duration, and transcribes spoken audio.
-* 🧠 `voxframe.engines`
-  * `author.py`: Coordinates the multi-stage visual composer, audits style outputs using fast vocabulary check algorithms, and manages targeted candidate improvements.
-  * `grader.py`: Emulates the official evaluation judge to grade candidate descriptions.
+Each task returns four captions: `formal`, `sarcastic`, `humorous_tech`, `humorous_non_tech`.
 
 ---
 
-## 🎯 Strategic Optimizations
+## 📂 Project Layout
 
-### 1. Verification-Guided Grounding (Comprehend -> Audit -> Compose)
-Instead of prompting the model to generate creative captions directly from raw frames, VoxFrame implements a **Stage A.1 Scene Comprehension** step to extract subject, setting, and motion details in a structured JSON layout. **Stage A.2 Verification** then re-evaluates the output against the visual frames to remove hallucinations. Finally, **Stage B** translates the verified grounding context into styled captions.
-
-### 2. Multi-Candidate Tone Refinement
-If the self-grader evaluates any tone below a critical score (`0.65` threshold), the refinement engine initiates candidate generation. It compiles three distinct variations for the flagging style and updates the output with the version scoring the highest cumulative quality.
-
-### 3. Punctuation & Style Guard (Audit Pass)
-Rule-based scripts run immediately after text generation to check target lengths and style markers:
-* **Formal**: Strict news tone, third-person active verbs, absolute ban on exclamation marks `!`.
-* **Sarcastic**: Irony checks, dry understatement, avoids simplistic slang.
-* **Humorous Tech**: Compares text against a vocabulary vector of 70+ software and hardware terms (e.g., `pipeline`, `I/O`, `latency`, `stack`, `GPU`).
-* **Humorous Non-Tech**: Filters and flags hard engineering concepts to keep the caption accessible.
+| Path | Role |
+|------|------|
+| `run.py` | Container entrypoint — reads `/input/tasks.json`, writes `/output/results.json` |
+| `voxframe/config/cfg.py` | API keys, models, timeouts, refinement threshold |
+| `voxframe/config/defs.py` | Pydantic schemas for captions and grader scores |
+| `voxframe/media_processing/media_utils.py` | Download, keyframes, scene-change sampling, ASR |
+| `voxframe/engines/author.py` | Stages A–E caption pipeline |
+| `voxframe/engines/grader.py` | Vision-based caption quality scoring |
+| `sample_inputs/tasks.json` | Local validation tasks |
+| `web_dashboard/` | Optional local UI on port 7860 |
 
 ---
 
-## ⚙️ Configuration Setup
+## ⚙️ Configuration
 
-Save your credentials inside a `.env` file at the root of the workspace:
+Copy `.env.example` to `.env` for local runs outside Docker:
 
 ```env
 FIREWORKS_API_KEY=your_key
 FIREWORKS_BASE_URL=https://api.fireworks.ai/inference/v1
 FIREWORKS_VISION_MODEL=accounts/fireworks/models/minimax-m3
-FIREWORKS_FALLBACK_VISION_MODEL=accounts/fireworks/models/qwen3p7-plus
+FIREWORKS_TEXT_MODEL=accounts/fireworks/models/deepseek-v4-pro
 
 GROQ_API_KEY=your_key
 GROQ_BASE_URL=https://api.groq.com/openai/v1
 GROQ_WHISPER_MODEL=whisper-large-v3
 
-# Parameters
-PER_CLIP_TIMEOUT_S=300       # Per-clip timeout (seconds)
-SCORE_THRESHOLD=0.65         # Minimum target quality score
-WEAK_STYLE_CANDIDATES=3      # Multi-candidate budget
+PER_CLIP_TIMEOUT_S=300
+MAX_CONCURRENT_CLIPS=1
+JSON_RETRY_ATTEMPTS=3
+SCORE_THRESHOLD=0.85
+WEAK_STYLE_CANDIDATES=3
+CAPTION_MIN_WORDS=8
+CAPTION_MAX_WORDS=70
 ```
+
+**Default models**
+
+- **Vision (`minimax-m3`)** — scene grounding, caption generation, grader (requires image input)
+- **Text (`deepseek-v4-pro`)** — reserved for text-only use; not used for image grading
 
 ---
 
-## 🚀 Running VoxFrame (Docker)
+## 🚀 Run Locally (Docker)
 
-To ensure a seamless experience across all environments, VoxFrame is entirely containerized using Docker. The necessary environment variables are pre-configured into the container, so no local setup is required.
+### Build
 
-### 1. Build the Docker Image
-First, build the Docker container using the provided `Dockerfile`.
 ```powershell
 docker build -t voxframe-app .
 ```
 
-### 2. Run the Visual Web Dashboard
-Start the container and expose port `7860` to access the premium drag-and-drop web interface. We mount local input and output directories so your data persists.
-
-**For Windows (PowerShell):**
-```powershell
-docker run -it --rm -p 7860:7860 -v "${PWD}\sample_inputs:/input" -v "${PWD}\output:/output" --name my-voxframe-app voxframe-app
-```
-
-**For Linux / macOS:**
-```bash
-docker run -it --rm -p 7860:7860 -v "$(pwd)/sample_inputs:/input" -v "$(pwd)/output:/output" --name my-voxframe-app voxframe-app
-```
-
-Then navigate your browser to **`http://127.0.0.1:7860`** to access the application.
-
-### 3. Distribute the Project
-To share the container with your team or upload it to lablab.ai, save the image as a `.tar` archive:
-```bash
-docker save -o voxframe-image.tar voxframe-app
-```
-
-### 4. Load from Archive (For Evaluators/Users)
-If you are receiving the `.tar` file, load it into your Docker engine and run the dashboard directly without needing the source code:
-
-**Load Image:**
-```bash
-docker load -i voxframe-image.tar
-```
-
-**Run Container (Windows PowerShell):**
-```powershell
-docker run -it --rm -p 7860:7860 -v "${PWD}\sample_inputs:/input" -v "${PWD}\output:/output" --name my-voxframe-app voxframe-app
-```
-
-**Run Container (Linux / macOS):**
-```bash
-docker run -it --rm -p 7860:7860 -v "$(pwd)/sample_inputs:/input" -v "$(pwd)/output:/output" --name my-voxframe-app voxframe-app
-```
-
----
-
-## 📦 Publishing to GitHub
-
-### Prerequisites
-- [Git](https://git-scm.com/downloads) installed
-- [Docker](https://www.docker.com/products/docker-desktop) installed and running
-- A GitHub account with access to [tayyabalitech/voxframe](https://github.com/tayyabalitech/voxframe)
-- A GitHub Personal Access Token (PAT) with `write:packages` and `repo` scopes
-  → Generate one at: **GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)**
-
----
-
-### 1. Push the Source Code to GitHub
+### Run evaluation engine (Track 2 / lablab.ai)
 
 ```powershell
-# Initialize git if not already done
-git init
-
-# Add the remote (skip if already set)
-git remote add origin https://github.com/tayyabalitech/voxframe.git
-
-# Stage all files (respects .gitignore — .env is excluded automatically)
-git add .
-
-# Commit
-git commit -m "feat: initial VoxFrame release"
-
-# Push to main branch
-git push -u origin main
-```
-
-> If your default branch is `master`, replace `main` with `master`. To rename it locally first:
-> ```powershell
-> git branch -M main
-> ```
-
----
-
-### 2. Build & Push the Docker Image to GHCR
-
-```powershell
-# Step 1: Log in to GitHub Container Registry
-# Replace YOUR_GITHUB_USERNAME and YOUR_PAT with your actual values
-docker login ghcr.io -u YOUR_GITHUB_USERNAME -p YOUR_PAT
-
-# Step 2: Build the image tagged for GHCR
-docker build -t ghcr.io/tayyabalitech/voxframe:latest .
-
-# Step 3: Push the image
-docker push ghcr.io/tayyabalitech/voxframe:latest
-
-# (Optional) Tag and push a versioned release alongside latest
-docker tag ghcr.io/tayyabalitech/voxframe:latest ghcr.io/tayyabalitech/voxframe:v1.0.0
-docker push ghcr.io/tayyabalitech/voxframe:v1.0.0
-```
-
-Once pushed, the package will be visible at:
-**https://github.com/tayyabalitech/voxframe/pkgs/container/voxframe**
-
----
-
-### 3. Pull & Run from GHCR (For Evaluators / Users)
-
-No source code needed — pull the image directly from the registry:
-
-```powershell
-# Authenticate (only needed for private packages)
-docker login ghcr.io -u YOUR_GITHUB_USERNAME -p YOUR_PAT
-
-# Pull the image
-docker pull ghcr.io/tayyabalitech/voxframe:latest
-
-# Run the container (Windows PowerShell)
 docker run -it --rm -p 7860:7860 `
   -v "${PWD}\sample_inputs:/input" `
   -v "${PWD}\output:/output" `
-  ghcr.io/tayyabalitech/voxframe:latest
+  --name my-voxframe-app voxframe-app
 ```
 
+Linux / macOS:
+
 ```bash
-# Run the container (Linux / macOS)
 docker run -it --rm -p 7860:7860 \
   -v "$(pwd)/sample_inputs:/input" \
   -v "$(pwd)/output:/output" \
-  ghcr.io/tayyabalitech/voxframe:latest
+  --name my-voxframe-app voxframe-app
 ```
 
-Then open **`http://127.0.0.1:7860`** in your browser.
+Results are written to `output/results.json`.
+
+### Save image archive (optional)
+
+```powershell
+docker save -o voxframe-image.tar voxframe-app
+```
+
+---
+
+## 📦 Push Source to GitHub
+
+From the project root, after reviewing `git status`:
+
+```powershell
+cd "D:\Track 2 project"
+
+git status
+git add .
+git commit -m "feat: minimax-m3 pipeline with grader refinement and JSON retry reliability"
+git push -u origin main
+```
+
+If the remote branch already exists and you only need to upload new commits:
+
+```powershell
+git add .
+git commit -m "feat: minimax-m3 pipeline with grader refinement and JSON retry reliability"
+git push origin main
+```
+
+Repository: **https://github.com/tayyabalitech/voxframe**
+
+---
+
+## 📦 Build & Push Docker Image to GHCR
+
+Use a GitHub PAT with `write:packages` and `repo` scopes.
+
+### 1. Log in to GHCR
+
+```powershell
+docker login ghcr.io -u tayyabalitech -p YOUR_GITHUB_PAT
+```
+
+### 2. Build and tag for GHCR
+
+```powershell
+cd "D:\Track 2 project"
+
+docker build -t ghcr.io/tayyabalitech/voxframe-app:latest .
+```
+
+### 3. Push to GitHub Container Registry
+
+```powershell
+docker push ghcr.io/tayyabalitech/voxframe-app:latest
+```
+
+### 4. (Optional) Versioned tag
+
+```powershell
+docker tag ghcr.io/tayyabalitech/voxframe-app:latest ghcr.io/tayyabalitech/voxframe-app:v2.0.0
+docker push ghcr.io/tayyabalitech/voxframe-app:v2.0.0
+```
+
+Package page: **https://github.com/tayyabalitech/voxframe/pkgs/container/voxframe-app**
+
+### 5. Make the package public (first time only)
+
+GitHub → **Packages** → `voxframe-app` → **Package settings** → **Change visibility** → **Public**
+
+Required for lablab.ai judges to pull without auth.
+
+---
+
+## 🧪 Pull & Run from GHCR
+
+```powershell
+docker login ghcr.io -u tayyabalitech -p YOUR_GITHUB_PAT
+docker pull ghcr.io/tayyabalitech/voxframe-app:latest
+
+docker run -it --rm -p 7860:7860 `
+  -v "${PWD}\sample_inputs:/input" `
+  -v "${PWD}\output:/output" `
+  ghcr.io/tayyabalitech/voxframe-app:latest
+```
+
+---
+
+## 🏁 lablab.ai Submission Checklist
+
+- [ ] Image is public on GHCR: `ghcr.io/tayyabalitech/voxframe-app:latest`
+- [ ] Container starts with `python run.py` (no manual setup)
+- [ ] `/output/results.json` is created for all tasks
+- [ ] Every task has all four caption styles
+- [ ] Full run completes within the hackathon timeout
+- [ ] Do not resubmit repeatedly to move up the queue (FAQ guidance)
+
+**Submit this image reference:**
+
+```text
+ghcr.io/tayyabalitech/voxframe-app:latest
+```
+
+---
+
+## 🎯 Design Notes
+
+- **JSON retry logic** handles intermittent vision-model prose/truncation on Stage A.
+- **Stage C repair** re-prompts only failing styles instead of failing the whole task.
+- **Stage E refinement** keeps the best candidate per weak style using the self-grader.
+- **Concurrency defaults to 1** for stable judge runs.
+
+---
+
+## 📄 License
+
+See repository license. Hackathon submission for AMD Developer Hackathon ACT II — Track 2.

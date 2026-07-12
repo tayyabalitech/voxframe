@@ -15,10 +15,8 @@ class AppConfig:
     # ── Inference Services Configuration ──────────────────────────────────────
     FIREWORKS_KEY: str = os.environ.get("FIREWORKS_API_KEY", "")
     FIREWORKS_URL: str = os.environ.get("FIREWORKS_BASE_URL", "https://api.fireworks.ai/inference/v1")
-    FIREWORKS_MODEL: str = os.environ.get("FIREWORKS_VISION_MODEL", "accounts/fireworks/models/minimax-m3")
-    FIREWORKS_FALLBACK: str = os.environ.get(
-        "FIREWORKS_FALLBACK_VISION_MODEL", "accounts/fireworks/models/qwen3p7-plus"
-    )
+    VISION_MODEL: str = os.environ.get("FIREWORKS_VISION_MODEL", "accounts/fireworks/models/minimax-m3")
+    TEXT_MODEL: str = os.environ.get("FIREWORKS_TEXT_MODEL", "accounts/fireworks/models/deepseek-v4-pro")
 
     # ── Transcription Settings ────────────────────────────────────────────────
     GROQ_KEY: str = os.environ.get("GROQ_API_KEY", "")
@@ -32,12 +30,14 @@ class AppConfig:
     # ── Video Processing Parameters ──────────────────────────────────────────
     KEYFRAME_LIMIT: int = int(os.environ.get("NUM_KEYFRAMES", "0"))  # 0 indicates adaptive sampling
     PER_CLIP_TIMEOUT: int = int(os.environ.get("PER_CLIP_TIMEOUT_S", "300"))
-    CONCURRENT_LIMIT: int = int(os.environ.get("MAX_CONCURRENT_CLIPS", "3"))
+    CONCURRENT_LIMIT: int = int(os.environ.get("MAX_CONCURRENT_CLIPS", "1"))
+    JSON_RETRY_ATTEMPTS: int = int(os.environ.get("JSON_RETRY_ATTEMPTS", "3"))
 
-    # ── Narrative Auditing & Refinement Rubrics ──────────────────────────────
-    EVAL_THRESHOLD: float = float(os.environ.get("SCORE_THRESHOLD", "0.65"))
     MIN_WORDS: int = int(os.environ.get("CAPTION_MIN_WORDS", "8"))
     MAX_WORDS: int = int(os.environ.get("CAPTION_MAX_WORDS", "70"))
+
+    # ── Quality Refinement Rubrics ────────────────────────────────────────────
+    EVAL_THRESHOLD: float = float(os.environ.get("SCORE_THRESHOLD", "0.85"))
     MAX_REGEN_TRIES: int = int(os.environ.get("WEAK_STYLE_CANDIDATES", "3"))
 
     # ── Target Formats ────────────────────────────────────────────────────────
@@ -56,3 +56,7 @@ class AppConfig:
                 "Missing required configuration: FIREWORKS_API_KEY is not defined. "
                 "Ensure it is set as an environment variable or present in a local .env file."
             )
+        if not cls.VISION_MODEL:
+            raise RuntimeError("Missing required configuration: FIREWORKS_VISION_MODEL is not defined.")
+        if not cls.TEXT_MODEL:
+            raise RuntimeError("Missing required configuration: FIREWORKS_TEXT_MODEL is not defined.")
