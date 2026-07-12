@@ -13,10 +13,12 @@ load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
 
 class AppConfig:
     # ── Inference Services Configuration ──────────────────────────────────────
-    FIREWORKS_KEY: str = os.environ.get("FIREWORKS_API_KEY", "")
-    FIREWORKS_URL: str = os.environ.get("FIREWORKS_BASE_URL", "https://api.fireworks.ai/inference/v1")
-    VISION_MODEL: str = os.environ.get("FIREWORKS_VISION_MODEL", "accounts/fireworks/models/minimax-m3")
-    TEXT_MODEL: str = os.environ.get("FIREWORKS_TEXT_MODEL", "accounts/fireworks/models/deepseek-v4-pro")
+    AIMLAPI_KEY: str = os.environ.get("AIMLAPI_KEY", "")
+    AIMLAPI_URL: str = os.environ.get("AIMLAPI_BASE_URL", "https://api.aimlapi.com/v1")
+    VISION_MODEL: str = os.environ.get("AIMLAPI_VISION_MODEL", "google/gemini-2.5-pro")
+    TEXT_MODEL: str = os.environ.get("AIMLAPI_TEXT_MODEL", "google/gemini-2.5-pro")
+    GRADER_MODEL: str = os.environ.get("AIMLAPI_GRADER_MODEL", "google/gemini-2.5-flash")
+    REFINEMENT_ENABLED: bool = int(os.environ.get("REFINEMENT_ENABLED", "0")) == 1
 
     # ── Transcription Settings ────────────────────────────────────────────────
     GROQ_KEY: str = os.environ.get("GROQ_API_KEY", "")
@@ -51,12 +53,14 @@ class AppConfig:
     @classmethod
     def validate_configuration(cls) -> None:
         """Confirms that required secret API keys are correctly set in the environment."""
-        if not cls.FIREWORKS_KEY:
+        if not cls.AIMLAPI_KEY:
             raise RuntimeError(
-                "Missing required configuration: FIREWORKS_API_KEY is not defined. "
+                "Missing required configuration: AIMLAPI_KEY is not defined. "
                 "Ensure it is set as an environment variable or present in a local .env file."
             )
         if not cls.VISION_MODEL:
-            raise RuntimeError("Missing required configuration: FIREWORKS_VISION_MODEL is not defined.")
+            raise RuntimeError("Missing required configuration: AIMLAPI_VISION_MODEL is not defined.")
         if not cls.TEXT_MODEL:
-            raise RuntimeError("Missing required configuration: FIREWORKS_TEXT_MODEL is not defined.")
+            raise RuntimeError("Missing required configuration: AIMLAPI_TEXT_MODEL is not defined.")
+        if not cls.GRADER_MODEL:
+            raise RuntimeError("Missing required configuration: AIMLAPI_GRADER_MODEL is not defined.")

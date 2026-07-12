@@ -120,6 +120,10 @@ def main() -> None:
     run_start_time = time.monotonic()
     results: list[dict | None] = [None] * len(tasks)
 
+    output_dir = os.path.dirname(AppConfig.RESULTS_OUTPUT)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
     # Submit tasks concurrently to the pool
     task_futures = []
     with ThreadPoolExecutor(max_workers=AppConfig.CONCURRENT_LIMIT) as thread_pool:
@@ -140,13 +144,10 @@ def main() -> None:
                     "task_id": tid,
                     "captions": get_empty_captions_dict(f"executor error: {exc}"),
                 }
-
-    output_dir = os.path.dirname(AppConfig.RESULTS_OUTPUT)
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
-
-    with open(AppConfig.RESULTS_OUTPUT, "w", encoding="utf-8") as file_handle:
-        json.dump(results, file_handle, indent=2, ensure_ascii=False)
+            
+            # Incremental save after each task
+            with open(AppConfig.RESULTS_OUTPUT, "w", encoding="utf-8") as file_handle:
+                json.dump([r for r in results if r is not None], file_handle, indent=2, ensure_ascii=False)
 
     total_duration = time.monotonic() - run_start_time
     print(f"\n{'=' * 60}")

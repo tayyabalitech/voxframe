@@ -435,6 +435,18 @@ Example C — Young woman working at a desktop computer in a modern office:
   sarcastic: "A person at a computer, apparently working, which is exactly what someone would do if they were not working."
   humorous_tech: "She has been staring at this bug for forty minutes. The bug is a missing comma. The comma is winning."
   humorous_non_tech: "A woman at a computer, visibly handling something extremely important that will be completely forgotten by Thursday."
+
+Example D — A person carefully slicing a green zucchini on a wooden cutting board:
+  formal: "A person in a kitchen is slicing a green zucchini into thin, even rounds on a wooden cutting board using a large chef's knife."
+  sarcastic: "Someone cutting a vegetable, truly groundbreaking culinary content."
+  humorous_tech: "Executing a repetitive slicing loop, outputting identical zucchini data packets with minimal latency."
+  humorous_non_tech: "Just chopping up some vegetables, mentally preparing to eat a salad that will definitely leave me hungry."
+
+Example E — A runner navigating a steep, rocky mountain trail:
+  formal: "A trail runner navigates a steep, rocky ridge line high in the mountains, carefully stepping over boulders while moving swiftly downhill."
+  sarcastic: "A person running down a rocky mountain, because running on flat ground was evidently too easy."
+  humorous_tech: "His velocity calculation iterates recursively without hitting any base condition, resulting in an uncontrolled descent."
+  humorous_non_tech: "This guy is running down a mountain like he just realized he left the stove on."
 """
 
 
@@ -651,7 +663,6 @@ def _invoke_vision_scene_call(
     response_mode: str,
     max_frames: int | None = None,
     use_json_prefix: bool = False,
-    max_tokens: int = 1200,
 ) -> str:
     """Issues one vision-model call and returns raw message content."""
     user_messages = [
@@ -672,7 +683,6 @@ def _invoke_vision_scene_call(
             },
             *user_messages,
         ],
-        max_tokens=max_tokens,
         temperature=0.25,
         response_format=_scene_response_format(response_mode),
     )
@@ -698,9 +708,9 @@ def generate_visual_context(
     instead of JSON, then falls back to a minimal three-frame request.
     """
     retry_strategies: tuple[dict, ...] = (
-        {"response_mode": "json_object", "instruction": SCENE_ANALYSIS_INSTRUCTION, "max_frames": 6, "json_prefix": False, "max_tokens": 800},
-        {"response_mode": "json_object", "instruction": SCENE_ANALYSIS_INSTRUCTION, "max_frames": 4, "json_prefix": False, "max_tokens": 1000},
-        {"response_mode": "json_object", "instruction": SCENE_ANALYSIS_MINIMAL, "max_frames": 3, "json_prefix": False, "max_tokens": 1200},
+        {"response_mode": "json_object", "instruction": SCENE_ANALYSIS_INSTRUCTION, "max_frames": 4, "json_prefix": False},
+        {"response_mode": "json_object", "instruction": SCENE_ANALYSIS_INSTRUCTION, "max_frames": 4, "json_prefix": False},
+        {"response_mode": "json_object", "instruction": SCENE_ANALYSIS_MINIMAL, "max_frames": 3, "json_prefix": False},
     )
     last_error: Exception | None = None
     best_partial: dict[str, str] = {}
@@ -716,7 +726,6 @@ def generate_visual_context(
                 strategy["response_mode"],
                 strategy["max_frames"],
                 strategy["json_prefix"],
-                strategy["max_tokens"],
             )
             best_partial = _merge_scene_partials(best_partial, salvage_json_string_fields(raw_text, SCENE_FIELD_KEYS))
             parsed_data = _parse_scene_response(raw_text)
@@ -730,8 +739,8 @@ def generate_visual_context(
                 time.sleep(0.75 * attempt_index)
 
     fallback_strategies: tuple[dict, ...] = (
-        {"instruction": _scene_hint_from_partial(best_partial), "max_frames": 3, "json_prefix": True, "max_tokens": 1400},
-        {"instruction": _scene_hint_from_partial(best_partial), "max_frames": 4, "json_prefix": False, "max_tokens": 1600},
+        {"instruction": _scene_hint_from_partial(best_partial), "max_frames": 3, "json_prefix": True},
+        {"instruction": _scene_hint_from_partial(best_partial), "max_frames": 4, "json_prefix": False},
     )
     for fallback_index, strategy in enumerate(fallback_strategies, start=1):
         try:
@@ -745,7 +754,6 @@ def generate_visual_context(
                 "json_object",
                 max_frames=strategy["max_frames"],
                 use_json_prefix=strategy["json_prefix"],
-                max_tokens=strategy["max_tokens"],
             )
             parsed_data = _parse_scene_response(raw_text)
             print(f"            Stage A recovered via fallback {fallback_index}.")
@@ -811,8 +819,6 @@ def ground_scene_verification(
                 },
                 {"role": "user", "content": payload_messages},
             ],
-            max_tokens=450,
-            temperature=0.1,
         )
         verified = (response.choices[0].message.content or "").strip()
         if is_valid_scene_report_text(verified):
@@ -831,7 +837,6 @@ def _invoke_vision_caption_call(
     frame_cache: dict[str, str],
     prompt_text: str,
     temperature: float,
-    max_tokens: int,
 ) -> str:
     """Issues one vision-model caption call and returns raw message content."""
     payload_messages: list[dict] = [{"type": "text", "text": prompt_text}]
@@ -844,7 +849,6 @@ def _invoke_vision_caption_call(
             {"role": "system", "content": "Emit one JSON object only. No prose."},
             {"role": "user", "content": payload_messages},
         ],
-        max_tokens=max_tokens,
         temperature=temperature,
         response_format={"type": "json_object"},
     )
@@ -867,9 +871,9 @@ def request_vision_caption_inference(
     full_prompt = assemble_composition_prompt(visual_report, transcript, priorities)
     compact_prompt = assemble_composition_prompt_compact(visual_report, priorities)
     strategies: tuple[dict, ...] = (
-        {"prompt": full_prompt, "max_tokens": 1500, "temperature": 0.85},
-        {"prompt": compact_prompt, "max_tokens": 1600, "temperature": 0.75},
-        {"prompt": compact_prompt, "max_tokens": 1800, "temperature": 0.65},
+        {"prompt": full_prompt, "temperature": 0.85},
+        {"prompt": compact_prompt, "temperature": 0.75},
+        {"prompt": compact_prompt, "temperature": 0.65},
     )
     last_error: Exception | None = None
 
@@ -882,7 +886,6 @@ def request_vision_caption_inference(
                 frame_cache,
                 strategy["prompt"],
                 strategy["temperature"],
-                strategy["max_tokens"],
             )
             captions = _parse_caption_response(raw_text)
             captions = apply_local_caption_fixes(captions)
@@ -979,7 +982,7 @@ def synthesize_narratives(frames: list[str], transcript: str = "") -> GeneratedC
     Stage A grounds the scene, Stage B drafts captions from frames, Stage C repairs
     audit violations, and Stages D/E refine weak styles using the self-grader.
     """
-    api_client = OpenAI(api_key=AppConfig.FIREWORKS_KEY, base_url=AppConfig.FIREWORKS_URL)
+    api_client = OpenAI(api_key=AppConfig.AIMLAPI_KEY, base_url=AppConfig.AIMLAPI_URL)
 
     frame_cache = {path: image_to_base64_uri(path) for path in frames}
 
@@ -1023,6 +1026,11 @@ def synthesize_narratives(frames: list[str], transcript: str = "") -> GeneratedC
             print(f"            Caption repair process failed: {repair_error}")
     else:
         print("            All style captions passed static validation.")
+
+    # Check for Fast Mode (skip LLM Refinement)
+    if not AppConfig.REFINEMENT_ENABLED:
+        print("            Fast Mode enabled: Skipping LLM Grading & Refinement (Stages D/E).")
+        return generated_output
 
     # ── LLM Quality Assessment ──
     print("  [Stage D] Evaluating captions against rubric criteria...")

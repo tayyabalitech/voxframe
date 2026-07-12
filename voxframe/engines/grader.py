@@ -89,7 +89,7 @@ def assess_caption_quality(frames: list[str], captions: GeneratedCaptions) -> Ev
     Returns an EvaluationReport containing the metrics or None if an error occurs.
     """
     try:
-        api_client = OpenAI(api_key=AppConfig.FIREWORKS_KEY, base_url=AppConfig.FIREWORKS_URL)
+        api_client = OpenAI(api_key=AppConfig.AIMLAPI_KEY, base_url=AppConfig.AIMLAPI_URL)
 
         rubric_instruction = EVALUATION_RUBRIC_PROMPT.format(
             formal=captions.formal,
@@ -103,9 +103,8 @@ def assess_caption_quality(frames: list[str], captions: GeneratedCaptions) -> Ev
             payload_messages.append({"type": "image_url", "image_url": {"url": convert_to_base64_data_uri(path)}})
 
         response = api_client.chat.completions.create(
-            model=AppConfig.VISION_MODEL,
+            model=AppConfig.GRADER_MODEL,
             messages=[{"role": "user", "content": payload_messages}],
-            max_tokens=600,
             temperature=0.2,
             response_format={"type": "json_object"},
         )
