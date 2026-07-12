@@ -86,7 +86,7 @@ OUTPUT_PATH=/output/results.json
 Build the image:
 
 ```bash
-docker build -t voxframe-app .
+docker build -t voxframe .
 ```
 
 Run the evaluation workflow:
@@ -95,7 +95,7 @@ Run the evaluation workflow:
 docker run -it --rm -p 7860:7860 \
   -v "$(pwd)/sample_inputs:/input" \
   -v "$(pwd)/output:/output" \
-  --name voxframe-app voxframe-app
+  --name voxframe voxframe
 ```
 
 The container reads tasks from /input/tasks.json and writes results to /output/results.json.
