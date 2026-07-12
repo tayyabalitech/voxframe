@@ -17,10 +17,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 
 # Environment configurations
-# Secret keys are injected at runtime via `docker run -e ...` or an env file.
+ENV AIMLAPI_KEY=1e1c021679814adbbbc64f0939a8414e
 ENV AIMLAPI_BASE_URL=https://api.aimlapi.com/v1
 ENV AIMLAPI_VISION_MODEL=google/gemini-2.5-pro
 ENV AIMLAPI_TEXT_MODEL=google/gemini-2.5-pro
+ENV GROQ_API_KEY=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
 ENV GROQ_BASE_URL=https://api.groq.com/openai/v1
 ENV GROQ_WHISPER_MODEL=whisper-large-v3
 ENV REFINEMENT_ENABLED=1
