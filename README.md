@@ -124,8 +124,6 @@ WEAK_STYLE_CANDIDATES=3      # Multi-candidate budget
 
 ## 🚀 Running VoxFrame (Docker)
 
-## 🚀 Running VoxFrame (Docker)
-
 To ensure a seamless experience across all environments, VoxFrame is entirely containerized using Docker. The necessary environment variables are pre-configured into the container, so no local setup is required.
 
 ### 1. Build the Docker Image
@@ -172,3 +170,93 @@ docker run -it --rm -p 7860:7860 -v "${PWD}\sample_inputs:/input" -v "${PWD}\out
 ```bash
 docker run -it --rm -p 7860:7860 -v "$(pwd)/sample_inputs:/input" -v "$(pwd)/output:/output" --name my-voxframe-app voxframe-app
 ```
+
+---
+
+## 📦 Publishing to GitHub
+
+### Prerequisites
+- [Git](https://git-scm.com/downloads) installed
+- [Docker](https://www.docker.com/products/docker-desktop) installed and running
+- A GitHub account with access to [tayyabalitech/voxframe](https://github.com/tayyabalitech/voxframe)
+- A GitHub Personal Access Token (PAT) with `write:packages` and `repo` scopes
+  → Generate one at: **GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)**
+
+---
+
+### 1. Push the Source Code to GitHub
+
+```powershell
+# Initialize git if not already done
+git init
+
+# Add the remote (skip if already set)
+git remote add origin https://github.com/tayyabalitech/voxframe.git
+
+# Stage all files (respects .gitignore — .env is excluded automatically)
+git add .
+
+# Commit
+git commit -m "feat: initial VoxFrame release"
+
+# Push to main branch
+git push -u origin main
+```
+
+> If your default branch is `master`, replace `main` with `master`. To rename it locally first:
+> ```powershell
+> git branch -M main
+> ```
+
+---
+
+### 2. Build & Push the Docker Image to GHCR
+
+```powershell
+# Step 1: Log in to GitHub Container Registry
+# Replace YOUR_GITHUB_USERNAME and YOUR_PAT with your actual values
+docker login ghcr.io -u YOUR_GITHUB_USERNAME -p YOUR_PAT
+
+# Step 2: Build the image tagged for GHCR
+docker build -t ghcr.io/tayyabalitech/voxframe:latest .
+
+# Step 3: Push the image
+docker push ghcr.io/tayyabalitech/voxframe:latest
+
+# (Optional) Tag and push a versioned release alongside latest
+docker tag ghcr.io/tayyabalitech/voxframe:latest ghcr.io/tayyabalitech/voxframe:v1.0.0
+docker push ghcr.io/tayyabalitech/voxframe:v1.0.0
+```
+
+Once pushed, the package will be visible at:
+**https://github.com/tayyabalitech/voxframe/pkgs/container/voxframe**
+
+---
+
+### 3. Pull & Run from GHCR (For Evaluators / Users)
+
+No source code needed — pull the image directly from the registry:
+
+```powershell
+# Authenticate (only needed for private packages)
+docker login ghcr.io -u YOUR_GITHUB_USERNAME -p YOUR_PAT
+
+# Pull the image
+docker pull ghcr.io/tayyabalitech/voxframe:latest
+
+# Run the container (Windows PowerShell)
+docker run -it --rm -p 7860:7860 `
+  -v "${PWD}\sample_inputs:/input" `
+  -v "${PWD}\output:/output" `
+  ghcr.io/tayyabalitech/voxframe:latest
+```
+
+```bash
+# Run the container (Linux / macOS)
+docker run -it --rm -p 7860:7860 \
+  -v "$(pwd)/sample_inputs:/input" \
+  -v "$(pwd)/output:/output" \
+  ghcr.io/tayyabalitech/voxframe:latest
+```
+
+Then open **`http://127.0.0.1:7860`** in your browser.
