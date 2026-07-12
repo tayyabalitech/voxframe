@@ -1,79 +1,73 @@
-# 🌌 VoxFrame — Multimodal Narrative Synthesis Engine
+# VoxFrame
 
+VoxFrame is a containerized multimodal video-captioning pipeline built for the AMD Developer Hackathon ACT II Track 2 challenge. It downloads video clips, extracts adaptive keyframes, optionally transcribes audio, grounds each scene with a vision-capable model, generates four stylistically distinct captions, audits them locally, and can refine weaker outputs with a second-pass grader.
+
+The project is designed to run in a reproducible Docker environment and to produce structured output for automated evaluation.
+
+## Overview
+
+The pipeline processes each task from a JSON input file and writes a structured result set to an output JSON file. Each task produces four captions:
+
+- formal
+- sarcastic
+- humorous_tech
+- humorous_non_tech
+
+## How the pipeline works
+
+1. Read task definitions from the input file.
+2. Download the target video clip.
+3. Extract adaptive keyframes and optional speech transcription.
+4. Generate a visual scene summary from the sampled frames.
+5. Produce styled captions grounded in that scene summary.
+6. Run local rule-based quality checks and targeted repairs.
+7. Optionally evaluate outputs with a grader and refine weak styles.
+8. Write the final results to the output file.
+
+## Project structure
+
+- [run.py](run.py) — main entrypoint for batch execution
+- [voxframe/config/cfg.py](voxframe/config/cfg.py) — runtime configuration and environment variable handling
+- [voxframe/config/defs.py](voxframe/config/defs.py) — Pydantic schemas for captions and evaluation results
+- [voxframe/media_processing/media_utils.py](voxframe/media_processing/media_utils.py) — video download, frame extraction, audio demuxing, and speech transcription
+- [voxframe/engines/author.py](voxframe/engines/author.py) — narration generation, audit, repair, and refinement stages
+- [voxframe/engines/grader.py](voxframe/engines/grader.py) — caption quality evaluation against the sampled frames
+- [web_dashboard/server.py](web_dashboard/server.py) — optional local web demo
+- [sample_inputs/tasks.json](sample_inputs/tasks.json) — example task list for local testing
+
+## Requirements
+
+The application requires:
+
+- Python 3.11+
+- Docker (recommended for evaluation runs)
+- FFmpeg available in the runtime environment
+- API access for AIMLAPI and Groq
+
+Python dependencies are listed in [requirements.txt](requirements.txt).
+
+## Configuration
+
+Create a local environment file before running outside Docker:
+
+```bash
+cp .env.example .env
 ```
- ___  __  ___  __  ___  __  ___  __  ___  __  ___  __ 
-|   \/  \|   \/  \|   \/  \|   \/  \|   \/  \|   \/  |
-|            V O X F R A M E   E N G I N E           |
-|___/\__/|___/\__/|___/\__/|___/\__/|___/\__/|___/\__|
-```
 
-**VoxFrame** is a video captioning pipeline for **AMD Developer Hackathon: ACT II (Track 2)**. It downloads each clip, extracts adaptive keyframes, optionally transcribes speech, grounds the scene with a vision model, generates four styled captions, audits them locally, and refines weak styles with a vision-based self-grader.
-
----
-
-## 🛠️ Pipeline Overview
-
-```
-sample_inputs/tasks.json
-        │
-        ▼
-Video download + adaptive keyframes (6/8/10) + Groq Whisper (optional)
-        │
-        ▼
-Stage A   Scene JSON grounding (minimax-m3)
-        │
-        ▼
-Stage A.2 Scene verification against frames
-        │
-        ▼
-Stage B   Vision-grounded caption JSON (minimax-m3 + frames)
-        │
-        ▼
-Stage C   Rule audit + targeted repair pass
-        │
-        ▼
-Stage D   Self-grader vs keyframes (minimax-m3)
-        │
-        ▼
-Stage E   Multi-candidate refinement for weak styles
-        │
-        ▼
-output/results.json
-```
-
-Each task returns four captions: `formal`, `sarcastic`, `humorous_tech`, `humorous_non_tech`.
-
----
-
-## 📂 Project Layout
-
-| Path | Role |
-|------|------|
-| `run.py` | Container entrypoint — reads `/input/tasks.json`, writes `/output/results.json` |
-| `voxframe/config/cfg.py` | API keys, models, timeouts, refinement threshold |
-| `voxframe/config/defs.py` | Pydantic schemas for captions and grader scores |
-| `voxframe/media_processing/media_utils.py` | Download, keyframes, scene-change sampling, ASR |
-| `voxframe/engines/author.py` | Stages A–E caption pipeline |
-| `voxframe/engines/grader.py` | Vision-based caption quality scoring |
-| `sample_inputs/tasks.json` | Local validation tasks |
-| `web_dashboard/` | Optional local UI on port 7860 |
-
----
-
-## ⚙️ Configuration
-
-Copy `.env.example` to `.env` for local runs outside Docker:
+The current implementation uses AIMLAPI for the vision and grading workflows and Groq for optional speech transcription. The main environment variables are:
 
 ```env
-FIREWORKS_API_KEY=your_key
-FIREWORKS_BASE_URL=https://api.fireworks.ai/inference/v1
-FIREWORKS_VISION_MODEL=accounts/fireworks/models/minimax-m3
-FIREWORKS_TEXT_MODEL=accounts/fireworks/models/deepseek-v4-pro
+AIMLAPI_KEY=your_aimlapi_key
+AIMLAPI_BASE_URL=https://api.aimlapi.com/v1
+AIMLAPI_VISION_MODEL=google/gemini-2.5-pro
+AIMLAPI_TEXT_MODEL=google/gemini-2.5-pro
+AIMLAPI_GRADER_MODEL=google/gemini-2.5-flash
 
-GROQ_API_KEY=your_key
+GROQ_API_KEY=your_groq_key
 GROQ_BASE_URL=https://api.groq.com/openai/v1
 GROQ_WHISPER_MODEL=whisper-large-v3
 
+REFINEMENT_ENABLED=1
 PER_CLIP_TIMEOUT_S=300
 MAX_CONCURRENT_CLIPS=1
 JSON_RETRY_ATTEMPTS=3
@@ -81,157 +75,98 @@ SCORE_THRESHOLD=0.85
 WEAK_STYLE_CANDIDATES=3
 CAPTION_MIN_WORDS=8
 CAPTION_MAX_WORDS=70
+INPUT_PATH=/input/tasks.json
+OUTPUT_PATH=/output/results.json
 ```
 
-**Default models**
+## Running locally
 
-- **Vision (`minimax-m3`)** — scene grounding, caption generation, grader (requires image input)
-- **Text (`deepseek-v4-pro`)** — reserved for text-only use; not used for image grading
+### Option 1: Docker (recommended)
 
----
+Build the image:
 
-## 🚀 Run Locally (Docker)
-
-### Build
-
-```powershell
+```bash
 docker build -t voxframe-app .
 ```
 
-### Run evaluation engine (Track 2 / lablab.ai)
-
-```powershell
-docker run -it --rm -p 7860:7860 `
-  -v "${PWD}\sample_inputs:/input" `
-  -v "${PWD}\output:/output" `
-  --name my-voxframe-app voxframe-app
-```
-
-Linux / macOS:
+Run the evaluation workflow:
 
 ```bash
 docker run -it --rm -p 7860:7860 \
   -v "$(pwd)/sample_inputs:/input" \
   -v "$(pwd)/output:/output" \
-  --name my-voxframe-app voxframe-app
+  --name voxframe-app voxframe-app
 ```
 
-Results are written to `output/results.json`.
+The container reads tasks from /input/tasks.json and writes results to /output/results.json.
 
-### Save image archive (optional)
+### Option 2: Local Python execution
 
-```powershell
-docker save -o voxframe-image.tar voxframe-app
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
 ```
 
----
+Run the engine directly:
 
-## 📦 Push Source to GitHub
-
-From the project root, after reviewing `git status`:
-
-```powershell
-cd "D:\Track 2 project"
-
-git status
-git add .
-git commit -m "feat: minimax-m3 pipeline with grader refinement and JSON retry reliability"
-git push -u origin main
+```bash
+python run.py
 ```
 
-If the remote branch already exists and you only need to upload new commits:
+This expects the input and output paths to be available in the environment or the default filesystem locations.
 
-```powershell
-git add .
-git commit -m "feat: minimax-m3 pipeline with grader refinement and JSON retry reliability"
-git push origin main
+## Web dashboard
+
+A lightweight local web interface is available through [web_dashboard/server.py](web_dashboard/server.py). It can be served with Uvicorn:
+
+```bash
+uvicorn web_dashboard.server:app --host 0.0.0.0 --port 7860
 ```
 
-Repository: **https://github.com/tayyabalitech/voxframe**
+## Input and output format
 
----
+### Input
 
-## 📦 Build & Push Docker Image to GHCR
+The task file should contain a list of objects with the following structure:
 
-Use a GitHub PAT with `write:packages` and `repo` scopes.
-
-### 1. Log in to GHCR
-
-```powershell
-docker login ghcr.io -u tayyabalitech -p YOUR_GITHUB_PAT
+```json
+[
+  {
+    "task_id": "v1",
+    "video_url": "https://example.com/clip.mp4",
+    "styles": ["formal", "sarcastic", "humorous_tech", "humorous_non_tech"]
+  }
+]
 ```
 
-### 2. Build and tag for GHCR
+### Output
 
-```powershell
-cd "D:\Track 2 project"
+Each task in the output file will include a task identifier and a captions object:
 
-docker build -t ghcr.io/tayyabalitech/voxframe-app:latest .
+```json
+{
+  "task_id": "v1",
+  "captions": {
+    "formal": "...",
+    "sarcastic": "...",
+    "humorous_tech": "...",
+    "humorous_non_tech": "..."
+  }
+}
 ```
 
-### 3. Push to GitHub Container Registry
+## Notes on implementation
 
-```powershell
-docker push ghcr.io/tayyabalitech/voxframe-app:latest
-```
+- The pipeline uses a staged approach for robustness: scene grounding, caption generation, audit and repair, and optional refinement.
+- JSON parsing and retry logic are included to handle model output that is incomplete or formatted inconsistently.
+- The default concurrency is intentionally low for stable evaluation runs.
+- The web dashboard is optional and is primarily intended for local demonstrations.
 
-### 4. (Optional) Versioned tag
+## Deployment notes
 
-```powershell
-docker tag ghcr.io/tayyabalitech/voxframe-app:latest ghcr.io/tayyabalitech/voxframe-app:v2.0.0
-docker push ghcr.io/tayyabalitech/voxframe-app:v2.0.0
-```
+The project is prepared for container-based evaluation and can be pushed to a container registry such as GitHub Container Registry. The Docker image entrypoint is configured to run the batch engine with Python.
 
-Package page: **https://github.com/tayyabalitech/voxframe/pkgs/container/voxframe-app**
+## License
 
-### 5. Make the package public (first time only)
-
-GitHub → **Packages** → `voxframe-app` → **Package settings** → **Change visibility** → **Public**
-
-Required for lablab.ai judges to pull without auth.
-
----
-
-## 🧪 Pull & Run from GHCR
-
-```powershell
-docker login ghcr.io -u tayyabalitech -p YOUR_GITHUB_PAT
-docker pull ghcr.io/tayyabalitech/voxframe-app:latest
-
-docker run -it --rm -p 7860:7860 `
-  -v "${PWD}\sample_inputs:/input" `
-  -v "${PWD}\output:/output" `
-  ghcr.io/tayyabalitech/voxframe-app:latest
-```
-
----
-
-## 🏁 lablab.ai Submission Checklist
-
-- [ ] Image is public on GHCR: `ghcr.io/tayyabalitech/voxframe-app:latest`
-- [ ] Container starts with `python run.py` (no manual setup)
-- [ ] `/output/results.json` is created for all tasks
-- [ ] Every task has all four caption styles
-- [ ] Full run completes within the hackathon timeout
-- [ ] Do not resubmit repeatedly to move up the queue (FAQ guidance)
-
-**Submit this image reference:**
-
-```text
-ghcr.io/tayyabalitech/voxframe-app:latest
-```
-
----
-
-## 🎯 Design Notes
-
-- **JSON retry logic** handles intermittent vision-model prose/truncation on Stage A.
-- **Stage C repair** re-prompts only failing styles instead of failing the whole task.
-- **Stage E refinement** keeps the best candidate per weak style using the self-grader.
-- **Concurrency defaults to 1** for stable judge runs.
-
----
-
-## 📄 License
-
-See repository license. Hackathon submission for AMD Developer Hackathon ACT II — Track 2.
+This repository is intended for the AMD Developer Hackathon ACT II Track 2 submission workflow.
