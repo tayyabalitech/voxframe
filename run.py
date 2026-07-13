@@ -5,6 +5,7 @@ Main entry point script. Reads input tasks, executes the processing engine
 concurrently, and saves structured narrative outputs to the target results file.
 """
 import json
+import multiprocessing
 import os
 import shutil
 import sys
@@ -88,16 +89,34 @@ def execute_single_task(task: dict) -> dict:
             shutil.rmtree(temp_dir_path, ignore_errors=True)
 
 
+def _execute_task_process(task: dict, output_pipe: multiprocessing.Queue) -> None:
+    """Runs execute_single_task inside a child process and sends the result back."""
+    try:
+        output_pipe.put(execute_single_task(task))
+    except Exception as error:
+        task_id = task.get("task_id", "?")
+        print(f"[{task_id}] Child process failed: {error}")
+        output_pipe.put({"task_id": task_id, "captions": get_empty_captions_dict(str(error)[:120])})
+
+
 def execute_task_with_timeout(task: dict, timeout_seconds: int) -> dict:
-    """Executes execute_single_task using a dedicated thread pool to enforce a timeout."""
+    """Executes execute_single_task in a separate process so timeouts can terminate hung work."""
     task_id = task.get("task_id", "?")
-    with ThreadPoolExecutor(max_workers=1) as single_thread_pool:
-        future_result = single_thread_pool.submit(execute_single_task, task)
-        try:
-            return future_result.result(timeout=timeout_seconds)
-        except FutureTimeout:
-            print(f"[{task_id}] Timeout exceeded ({timeout_seconds}s)")
-            return {"task_id": task_id, "captions": get_empty_captions_dict("process timeout")}
+    result_queue = multiprocessing.Queue()
+    worker_process = multiprocessing.Process(target=_execute_task_process, args=(task, result_queue))
+    worker_process.start()
+    worker_process.join(timeout_seconds)
+    if worker_process.is_alive():
+        print(f"[{task_id}] Timeout exceeded ({timeout_seconds}s)")
+        worker_process.terminate()
+        worker_process.join()
+        return {"task_id": task_id, "captions": get_empty_captions_dict("process timeout")}
+
+    try:
+        return result_queue.get_nowait()
+    except Exception as error:
+        print(f"[{task_id}] No result returned from child process: {error}")
+        return {"task_id": task_id, "captions": get_empty_captions_dict("process failed")}
 
 
 # ── Execution Entrypoint ───────────────────────────────────────────────────────
