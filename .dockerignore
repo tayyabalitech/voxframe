@@ -1,0 +1,27 @@
+# ── Ignore credentials ────────────────────────────────────────────────────────
+.env
+
+# ── Ignore python build files ────────────────────────────────────────────────
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ── Ignore visual resources & dashboard outputs ──────────────────────────────
+examples/
+input/
+output/
+test_clips/
+test_clips_results.json
+
+# ── Ignore developer test scripts & media ────────────────────────────────────
+debug.py
+test_*.py
+puppy_test.mp4
+puppy_sound.mp4
+puppy_eat.mp4
+cat.mp4
+
+# ── Ignore Git version metadata ──────────────────────────────────────────────
+.git/
+.gitignore
