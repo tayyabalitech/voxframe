@@ -22,7 +22,8 @@ from voxframe.engines.author import synthesize_narratives
 
 def get_empty_captions_dict(error_reason: str) -> dict:
     """Yields a well-formed dictionary with error explanations for all target styles."""
-    failure_message = f"Narration pipeline unavailable ({error_reason})."
+    error_summary = str(error_reason).strip()[:120] or "unspecified error"
+    failure_message = f"Narration pipeline unavailable ({error_summary})."
     return {style: failure_message for style in AppConfig.TARGET_STYLES}
 
 
